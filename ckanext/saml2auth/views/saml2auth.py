@@ -31,14 +31,26 @@ def get_ckan_user(email):
         return ckan_user
     log.debug('CKAN user not found for {}'.format(email))
 
+def get_extras(national_center):
+    return {
+            u'governportal': {
+                u'nstda_employee': True,
+                u'national_center': national_center
+            }
+        }
 
-def create_user(context, email, full_name):
+def create_user(context, email, full_name, national_center=None):
+    """create nstda user center"""
+    govern_center = None
+    if national_center:
+        govern_center = get_extras(national_center)
     """ Create a new CKAN user from saml """
     data_dict = {
         u'name': h.ensure_unique_username_from_email(email),
         u'fullname': full_name,
         u'email': email,
-        u'password': h.generate_password()
+        u'password': h.generate_password(),
+        u'plugin_extras': govern_center
     }
 
     try:
@@ -50,6 +62,27 @@ def create_user(context, email, full_name):
         base.abort(400, error_message)
 
     return user_dict
+
+def update_extra(context, user, national_center=None):
+    """create nstda user center"""
+    govern_center = None
+    if national_center:
+        govern_center = get_extras(national_center)
+    """update user saml plugin extra"""
+    context['success'] = True
+    data_dict = {
+        u'id': user.id,
+        u'email': user.email,
+        u'plugin_extras': govern_center
+    }
+
+    try:
+        user_dict = logic.get_action(u'user_update')(context, data_dict)
+        log.info('CKAN user update: {}'.format(data_dict['id']))
+    except logic.ValidationError as e:
+        error_message = (e.error_summary or e.message or e.error_dict)
+        log.error(error_message)
+        base.abort(400, error_message)
 
 
 def acs():
@@ -74,6 +107,8 @@ def acs():
         config.get(u'ckanext.saml2auth.user_fullname')
     saml_user_email = \
         config.get(u'ckanext.saml2auth.user_email')
+    saml_user_governance = \
+        config.get(u'ckanext.saml2auth.user_governance')
 
     config_sp = sp_config()
     saml_response = request.form.get(u'SAMLResponse', None)
@@ -102,7 +137,12 @@ def acs():
     log.debug('User info {} SAML id {}'.format(user_info, saml_id))
 
     # Required user attributes for user creation
+    # log.info(auth_response.ava[saml_user_email])
+    log.info("show org name " + auth_response.ava['org_name'][0])
     email = auth_response.ava[saml_user_email][0]
+    national_center = None
+    if saml_user_governance:
+        national_center = auth_response.ava[config.get('ckanext.saml2auth.user_org')][0]
 
     if saml_user_firstname and saml_user_lastname:
         first_name = auth_response.ava.get(saml_user_firstname, [email.split('@')[0]])[0]
@@ -116,15 +156,20 @@ def acs():
 
     # Check if CKAN-SAML user exists for the current SAML login
     user = get_ckan_user(email)
-
+    log.info('{}'.format(user.plugin_extras))
     if not user:
-        user_dict = create_user(context, email, full_name)
+        user_dict = create_user(context, email, full_name, national_center)
     else:
+        # If account exists and not user plugin_extras data
         # If account exists and is deleted, reactivate it.
         h.activate_user_if_deleted(user)
         user_dict = model_dictize.user_dictize(user, context)
 
     g.user = user_dict['name']
+
+    if user.plugin_extras is None and saml_user_governance:
+        log.info("User don't have plugin_extras data")
+        update_extra(context, user, national_center)
 
     # Check if the authenticated user email is in given list of emails
     # and make that user sysadmin and opposite
