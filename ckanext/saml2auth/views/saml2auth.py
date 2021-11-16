@@ -138,7 +138,7 @@ def acs():
 
     # Required user attributes for user creation
     # log.info(auth_response.ava[saml_user_email])
-    log.info("show org name " + auth_response.ava['org_name'][0])
+    # log.info("show org name " + auth_response.ava['org_name'][0])
     email = auth_response.ava[saml_user_email][0]
     national_center = None
     if saml_user_governance:
