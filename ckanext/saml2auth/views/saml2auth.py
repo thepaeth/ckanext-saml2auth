@@ -156,7 +156,7 @@ def acs():
 
     # Check if CKAN-SAML user exists for the current SAML login
     user = get_ckan_user(email)
-    log.info('{}'.format(user.plugin_extras))
+    # log.info('{}'.format(user.plugin_extras))
     if not user:
         user_dict = create_user(context, email, full_name, national_center)
     else:
