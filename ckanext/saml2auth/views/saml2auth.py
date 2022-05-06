@@ -196,8 +196,8 @@ def acs():
 
     # update user plugin extra for old user update
     if user is not None:
-        if user.name != emp_id:
-            update_user(context, user, emp_id)
+        # if user.name != emp_id:
+        #     update_user(context, user, emp_id)
         if user.plugin_extras is None and saml_user_governance:
             update_extra(context, user, extra_portal)
         if user.plugin_extras is not None \
