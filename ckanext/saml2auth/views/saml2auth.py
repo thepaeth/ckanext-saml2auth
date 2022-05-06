@@ -44,7 +44,8 @@ def create_user(context, email, full_name, extra_portal=None):
         govern_center = get_extras(extra_portal)
     """ Create a new CKAN user from saml """
     data_dict = {
-        u'name': h.ensure_unique_username_from_email(email),
+        # u'name': h.ensure_unique_username_from_email(email),
+        u'name': extra_portal['employee_code'],
         u'fullname': full_name,
         u'email': email,
         u'password': h.generate_password(),
@@ -72,6 +73,23 @@ def update_extra(context, user, extra_portal=None):
         u'id': user.id,
         u'email': user.email,
         u'plugin_extras': govern_center
+    }
+
+    try:
+        user_dict = logic.get_action(u'user_update')(context, data_dict)
+        # log.info('CKAN user update: {}'.format(data_dict['id']))
+    except logic.ValidationError as e:
+        error_message = (e.error_summary or e.message or e.error_dict)
+        log.error(error_message)
+        base.abort(400, error_message)
+    
+def update_user(context, user, emp_id):
+    """update name of ckan user with employee_id"""
+    context['success'] = True
+    data_dict = {
+        u'id': user.id,
+        u'email': user.email,
+        u'name': emp_id
     }
 
     try:
@@ -178,6 +196,8 @@ def acs():
 
     # update user plugin extra for old user update
     if user is not None:
+        if user.name != emp_id:
+            update_user(context, user, emp_id)
         if user.plugin_extras is None and saml_user_governance:
             update_extra(context, user, extra_portal)
         if user.plugin_extras is not None \
